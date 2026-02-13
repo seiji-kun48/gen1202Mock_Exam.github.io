@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GEN1202 Exam Simulator</title>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f3f4f6; }
+        .no-select { user-select: none; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-gray-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // --- ตั้งค่าการสอบ ---
+        const EXAM_CONFIG = {
+            duration: 120 * 60, // 1 ชั่วโมง 30 นาที
+            totalQuestionsInExam: 90, // จำนวนข้อที่จะสุ่มมาทำในโหมดสอบจริง
+        };
+
+        // --- ฐานข้อมูลข้อสอบ (รวมชุด 1 และ 2) ---
+        // หมายเหตุ: a: 0=ก, 1=ข, 2=ค, 3=ง
+        const QUESTION_POOL = [
+            // --- ชุดที่ 1 (ตัวอย่างบางส่วน) ---
+            { q: "ในการแนะนำบุคคล หากมีศักดิ์เสมอกัน ควรยึดหลักใด", options: ["แนะนำผู้หญิงให้รู้จักผู้ชาย", "แนะนำผู้ชายให้รู้จักผู้หญิง", "แนะนำผู้ที่มีอายุน้อยกว่าให้รู้จักผู้ที่มีอายุมากกว่า", "แนะนำใครก่อนก็ได้"], a: 2 },
+            { q: "เมื่อได้รับนามบัตรจากผู้อื่น มารยาทที่ถูกต้องที่สุดคือข้อใด", options: ["รีบเก็บใส่กระเป๋าทันทีเพื่อความรวดเร็ว", "ใช้มือซ้ายรับและส่งต่อให้เลขา", "ใช้มือขวารับ (หรือสองมือ) อ่านทวนชื่อและรายละเอียดสักครู่ก่อนเก็บ", "เขียนวันที่ได้รับลงบนนามบัตรทันทีต่อหน้าเจ้าของ"], a: 2 },
+            { q: "ระยะห่างทางสังคม (Social Zone) ในการติดต่อธุรกิจหรือสนทนากับคนไม่คุ้นเคย คือระยะใด", options: ["0 – 2 ฟุต", "2 – 4 ฟุต", "4 – 12 ฟุต", "12 ฟุตขึ้นไป"], a: 2 },
+            { q: "การนั่งเก้าอี้ในพิธีการที่เป็นทางการ สุภาพสตรีควรปฏิบัติอย่างไร", options: ["นั่งไขว่ห้างได้ถ้าเมื่อย", "นั่งเต็มก้น หลังพิงพนัก เข่าชิดกัน", "นั่งเพียงครึ่งเก้าอี้เพื่อพร้อมลุกเสมอ", "นั่งเอนหลังตามสบาย"], a: 1 },
+            { q: "ข้อใด *ไม่ใช่* มารยาทในการเดินนำผู้ใหญ่", options: ["เดินเยื้องไปทางซ้ายของผู้ใหญ่เล็กน้อย (ฐานะผู้ติดตาม)", "เดินนำหน้าในระยะห่างพอสมควร", "เดินตัวตรงตามปกติ ไม่ต้องค้อมตัว", "ระมัดระวังเส้นทางให้ผู้ใหญ่"], a: 0 },
+            { q: "เมื่อรับประทานอาหารชุดตะวันตก หากต้องการพักทานอาหารชั่วคราว ควรวางมีดและส้อมอย่างไร", options: ["วางขนานกันไว้ขอบจานด้านขวา", "วางปลายมีดและส้อมชนกันเป็นรูปสามเหลี่ยม (หรือกากบาท) บนจาน", "วางไว้นอกจานบนโต๊ะ", "ถือค้างไว้ในมือ"], a: 1 },
+            { q: "\"ค็อกเทล\" (Cocktail) ในงานเลี้ยง เดิมทีหมายถึงเครื่องดื่มประเภทใด", options: ["เหล้าผสมผลไม้หรือเครื่องดื่มอื่นๆ", "ไวน์แดง", "แชมเปญ", "เบียร์สด"], a: 0 },
+            { q: "แก้วไวน์แดง (Red Wine Glass) มักมีลักษณะอย่างไรเมื่อเทียบกับแก้วไวน์ขาว", options: ["ทรงผอมสูงกว่า", "ตัวแก้ว (Bowl) ใหญ่และป่องกว่า", "ขนาดเล็กกว่ามาก", "ไม่มีก้านแก้ว"], a: 1 },
+            { q: "การใช้ \"ช้อนกลาง\" ในการรับประทานอาหารไทย แสดงถึงเรื่องใดมากที่สุด", options: ["ความหรูหรา", "สุขอนามัยและมารยาททางสังคม", "ความเป็นผู้ดีเก่า", "การประหยัดอาหาร"], a: 1 },
+            { q: "หากไปร่วมงานเลี้ยงแล้วเจ้าภาพเสิร์ฟอาหารที่เราแพ้ หรือทานไม่ได้ ควรทำอย่างไร", options: ["โวยวายขอเปลี่ยนอาหารทันที", "นั่งเฉยๆ ไม่แตะต้องจานนั้นและทานอย่างอื่นแทนเงียบๆ", "ตักแบ่งให้เพื่อนข้างๆ ทานแทน", "ฝืนทานให้หมดเพื่อรักษาน้ำใจ"], a: 1 },
+            { q: "การไหว้ระดับที่ 2 (ไหว้บิดามารดา ครูอาจารย์) นิ้วหัวแม่มือควรอยู่ที่ใด", options: ["ระหว่างคิ้ว", "ปลายจมูก", "ปลายคาง", "หน้าอก"], a: 1 },
+            { q: "ท่ากราบแบบ \"เบญจางคประดิษฐ์\" ประกอบด้วยอวัยวะส่วนใดบ้างที่จรดพื้น", options: ["หน้าผาก 1, ฝ่ามือ 2, เข่า 2", "หน้าผาก 1, ศอก 2, เข่า 2", "จมูก 1, มือ 2, เท้า 2", "หน้าผาก 1, มือ 2, ศอก 2"], a: 0 },
+            { q: "การส่งของให้ผู้ใหญ่ ขณะผู้ใหญ่นั่งเก้าอี้ ผู้ส่งควรทำอย่างไร", options: ["ยืนส่งให้เลย", "คุกเข่าหรือย่อตัวลงให้อยู่ระดับใกล้เคียงกันแล้วส่ง", "วางของไว้บนโต๊ะแล้วเดินหนี", "โยนให้เบาๆ"], a: 1 },
+            { q: "ในที่ทำงาน หากต้องเดินสวนกับผู้บังคับบัญชาในทางแคบ ควรปฏิบัติอย่างไร", options: ["เดินชนไหล่ไปเลย", "หยุดยืนและหลีกทางให้ท่านไปก่อน พร้อมก้มศีรษะเล็กน้อย", "เร่งฝีเท้าเพื่อเดินผ่านให้เร็วที่สุด", "ตะโกนขอทาง"], a: 1 },
+            { q: "ข้อใดคือมารยาทในการใช้ลิฟต์", options: ["ยืนขวางประตูเพื่อรอเพื่อน", "คุยโทรศัพท์เสียงดังในลิฟต์", "ให้ผู้ที่อยู่ข้างในเดินออกมาก่อน แล้วจึงเดินสวนเข้าไป", "รีบแทรกตัวเข้าไปทันทีที่ประตูเปิด"], a: 2 },
+            { q: "การรับประทาน \"สปาเกตตี\" ที่สุภาพ ควรใช้อุปกรณ์ใด", options: ["ใช้มีดตัดเส้นให้สั้นแล้วใช้ช้อนตัก", "ใช้ส้อมม้วนเส้นให้พอดีคำ (อาจใช้ช้อนช่วยรอง)", "ใช้ตะเกียบคีบ", "สูบเส้นเข้าปากให้มีเสียงดังเพื่อแสดงความอร่อย"], a: 1 },
+            { q: "เมื่อไอหรือจามขณะอยู่ในที่สาธารณะ นอกจากปิดปากแล้ว ควรกล่าวคำว่าอะไร", options: ["ขอบคุณ (Thank you)", "ขอโทษ (Excuse me)", "สวัสดี (Hello)", "ไม่ต้องกล่าวอะไร"], a: 1 },
+            { q: "การจับมือทักทายแบบสากล (Handshake) ควรใช้มือข้างใด", options: ["ข้างซ้าย", "ข้างขวา", "ทั้งสองข้างกุมกัน", "ข้างไหนก็ได้ที่ถนัด"], a: 1 },
+            { q: "ในงานศพ หากได้รับเชิญให้ทอดผ้าบังสุกุล ควรทำสิ่งใดก่อนวางผ้า", options: ["จุดธูปไหว้ศพ", "กราบพระสงฆ์", "คารวะศพ (ไหว้หรือโค้งคำนับ)", "หันมารับไหว้เจ้าภาพ"], a: 2 },
+            { q: "การเยี่ยมไข้ที่โรงพยาบาล สิ่งที่ *ไม่ควร* ทำคือข้อใด", options: ["นำของเยี่ยมที่เป็นประโยชน์ไปฝาก", "พูดคุยเรื่องตลกโปกฮาเสียงดังลั่นห้อง", "ให้กำลังใจผู้ป่วย", "แต่งกายสุภาพ"], a: 1 },
+            { q: "มารยาททางดิจิทัล (Netiquette) ข้อใดสำคัญที่สุด", options: ["การใช้ตัวอักษรพิมพ์ใหญ่ทั้งหมด (CAPS LOCK)", "การเคารพสิทธิและความเป็นส่วนตัวของผู้อื่น", "การส่งจดหมายลูกโซ่ให้ครบทุกคน", "การตอบโต้ทุกคอมเมนต์ที่เห็นต่าง"], a: 1 },
+            { q: "ในการประชุม หากต้องการแสดงความคิดเห็น ควรทำอย่างไร", options: ["ยกมือขออนุญาตประธานในที่ประชุมก่อน", "พูดแทรกขึ้นมาทันทีเมื่อนึกได้", "กระซิบคนข้างๆ ให้พูดแทน", "ส่งไลน์เข้ากลุ่มประชุม"], a: 0 },
+            { q: "\"Ladies First\" หมายถึงการให้เกียรติสุภาพสตรีในเรื่องใด", options: ["ให้เดินนำหน้า หรือเข้า-ออกประตูก่อน", "ให้จ่ายเงินก่อน", "ให้ทำงานหนักก่อน", "ให้กลับบ้านทีหลัง"], a: 0 },
+            { q: "หากทำน้ำหกบนโต๊ะอาหารในงานเลี้ยง ควรทำอย่างไร", options: ["นั่งนิ่งๆ เหมือนไม่มีอะไรเกิดขึ้น", "รีบใช้ผ้าเช็ดปากของตนเช็ดถูอย่างแรง", "กล่าวขอโทษคนข้างๆ และเรียกบริกรมาจัดการ", "ลุกหนีออกจากโต๊ะทันที"], a: 2 },
+            { q: "การสนทนาบนโต๊ะอาหาร ควรหลีกเลี่ยงเรื่องใด", options: ["เรื่องดินฟ้าอากาศ", "เรื่องอาหารอร่อย", "เรื่องเจ็บป่วย สยดสยอง หรือความขัดแย้งรุนแรง", "เรื่องการท่องเที่ยว"], a: 2 },
+            { q: "การแต่งกายไปสัมภาษณ์งาน ข้อใดปลอดภัยและเหมาะสมที่สุด", options: ["กางเกงยีนส์กับเสื้อยืดสีขาว", "ชุดสูทหรือชุดทำงานสีสุภาพ (เช่น สีน้ำเงินเข้ม, สีเทา)", "ชุดราตรีสั้น", "ชุดแฟชั่นสีสะท้อนแสง"], a: 1 },
+            { q: "สาวรูปร่าง \"แอปเปิ้ล\" (Apple Shape) มีจุดเด่น-จุดด้อยตรงไหน", options: ["เอวคอด สะโพกใหญ่", "ช่วงตัวหนา เอวไม่ชัด ขาอาจจะเรียว", "ไหล่กว้างกว่าสะโพก", "ผอมแห้งทั้งตัว"], a: 1 },
+            { q: "เสื้อคอวี (V-Neck) เหมาะกับคนรูปร่างลักษณะใด", options: ["คนคอยาว", "คนคอสั้น หรือหน้ากลม (ช่วยให้คอดูยาวขึ้น)", "คนผอมมาก", "คนไหล่ตก"], a: 1 },
+            { q: "สีคู่ตรงข้าม (Contrast) ในวงจรสี หากนำมาแต่งกายด้วยกันจะให้ความรู้สึกอย่างไร", options: ["กลมกลืน เรียบง่าย", "โดดเด่น สะดุดตา แต่อาจดูแรงถ้าไม่ระวัง", "เศร้าหมอง", "สุภาพ ทางการ"], a: 1 },
+            { q: "สาวผิว \"ขาวอมชมพู\" เหมาะกับเสื้อผ้าโทนสีใด", options: ["สีพาสเทล หรือโทนเย็น (Cool Tone)", "สีหม่นหมอง", "สีส้มอิฐเข้มๆ เท่านั้น", "สีดำทั้งตัว"], a: 0 },
+            { q: "กระโปรงทรง \"Pencil Skirt\" (ทรงดินสอ) เหมาะกับสาวรูปร่างใดที่สุด", options: ["สาวรูปร่างแอปเปิ้ล", "สาวรูปร่างนาฬิกาทราย (ช่วยเน้นเอวและสะโพก)", "สาวรูปร่างลูกแพร์", "สาวรูปร่างสามเหลี่ยมคว่ำ"], a: 1 },
+            { q: "\"Smart Casual\" หมายถึงการแต่งกายแบบใด", options: ["ชุดสูทเต็มยศ", "กึ่งทางการ ดูดีแต่ผ่อนคลาย", "เสื้อกล้าม กางเกงขาสั้น", "ชุดนอน"], a: 1 },
+            { q: "คนที่มีรูปร่างเตี้ย ควรหลีกเลี่ยงเสื้อผ้าแบบใด", options: ["ลายทางลง", "เสื้อคอวี", "เสื้อตัวยาวคลุมสะโพกมากๆ หรือกางเกงขาบานใหญ่", "รองเท้าส้นสูง"], a: 2 },
+            { q: "เข็มขัดของผู้ชาย ควรมีสีสอดคล้องกับสิ่งใด", options: ["เสื้อ", "กางเกง", "รองเท้า", "เนคไท"], a: 2 },
+            { q: "สี \"กรมท่า\" (Navy Blue) สื่อความหมายถึงอะไรในการทำงาน", options: ["ความคิดสร้างสรรค์", "ความน่าเชื่อถือ ความเป็นมืออาชีพ และอำนาจ", "ความอ่อนโยน", "ความสนุกสนาน"], a: 1 },
+            { q: "หากต้องไปงานศพ แต่ไม่มีชุดดำสนิท สามารถอนุโลมใส่สีใดได้", options: ["สีแดงเลือดหมู", "สีขาว หรือสีเทา/น้ำเงินเข้ม (โทนสุภาพไว้ทุกข์)", "สีเหลืองสดใส", "สีชมพูอ่อน"], a: 1 },
+            { q: "รูปร่างผู้ชายแบบ \"สามเหลี่ยมหัวกลับ\" (V-Shape) คือรูปร่างแบบใด", options: ["ไหล่แคบ พุงป่อง", "ไหล่กว้าง เอวสอบ (รูปร่างนักกีฬา/สมส่วน)", "ผอมสูง ตรงทื่อ", "อ้วนเตี้ย"], a: 1 },
+            { q: "เสื้อผ้าที่ \"ยับยู่ยี่\" ส่งผลเสียต่อบุคลิกภาพด้านใดมากที่สุด", options: ["ความทันสมัย", "ความน่าเชื่อถือและความสะอาดเรียบร้อย", "ราคาของชุด", "สีสันของชุด"], a: 1 },
+            { q: "การติดกระดุมเสื้อสูท (แบบ 2 เม็ด) ของผู้ชาย ข้อใดถูกต้องขณะยืน", options: ["ติดทุกเม็ด", "ติดเม็ดบนเม็ดเดียว (เม็ดล่างปล่อยไว้)", "ไม่ติดเลย", "ติดเม็ดล่างเม็ดเดียว"], a: 1 },
+            { q: "ชุด \"Cocktail Dress\" ของสุภาพสตรี มักมีความยาวระดับใด", options: ["ยาวลากพื้น", "สั้นประมาณเข่า หรือคลุมเข่าเล็กน้อย", "สั้นจุ๊ดจู๋", "เป็นชุดกางเกงเท่านั้น"], a: 1 },
+            { q: "ใครคือผู้ที่นำเสนอแนวคิดเรื่อง \"ความฉลาดทางอารมณ์\" (EQ) จนโด่งดัง", options: ["Sigmund Freud", "Daniel Goleman", "Maslow", "Sheldon"], a: 1 },
+            { q: "Self-Regulation ในองค์ประกอบของ EQ หมายถึงอะไร", options: ["การรู้จักอารมณ์ตัวเอง", "การจัดการ/ควบคุมอารมณ์ตนเอง", "การจูงใจผู้อื่น", "การเห็นใจผู้อื่น"], a: 1 },
+            { q: "\"ใจเป็นนาย กายเป็นบ่าว\" ตรงกับหลักการพัฒนาบุคลิกภาพด้านใด", options: ["การแต่งกาย", "บุคลิกภาพภายใน (จิตใจ) ส่งผลสู่ภายนอก", "การออกกำลังกาย", "การทำศัลยกรรม"], a: 1 },
+            { q: "ข้อใดคือลักษณะของคนที่มี \"Growth Mindset\"", options: ["เชื่อว่าความเก่งเป็นพรสวรรค์ เปลี่ยนแปลงไม่ได้", "มองความล้มเหลวเป็นโอกาสในการเรียนรู้และพัฒนา", "หลีกเลี่ยงงานยากๆ", "อิจฉาเมื่อเห็นคนอื่นได้ดี"], a: 1 },
+            { q: "ความเครียด (Stress) ส่งผลเสียต่อร่างกายอย่างไรบ้าง", options: ["นอนไม่หลับ ปวดหัว", "ความดันโลหิตสูง", "ภูมิต้านทานลดลง", "ถูกทุกข้อ"], a: 3 },
+            { q: "Id (อิด) ทำงานตามหลักการใด", options: ["หลักแห่งความเป็นจริง (Reality Principle)", "หลักแห่งความพอใจ (Pleasure Principle)", "หลักศีลธรรม (Moral Principle)", "หลักเหตุผล"], a: 1 },
+            { q: "ข้อใดเป็นการแสดงออกของผู้ที่มี EQ ต่ำ", options: ["รับฟังความคิดเห็นผู้อื่น", "ควบคุมอารมณ์โกรธไม่ได้ อาละวาดเมื่อไม่ได้ดั่งใจ", "ให้กำลังใจเพื่อนเมื่อเพื่อนท้อ", "ยิ้มแย้มแจ่มใส"], a: 1 },
+            { q: "ความต้องการขั้นสูงสุดของ Maslow คืออะไร", options: ["ความต้องการทางกาย", "ความปลอดภัย", "ความรัก", "การบรรลุสัจภาวะแห่งตน (Self-Actualization)"], a: 3 },
+            { q: "Empathy (ความเห็นอกเห็นใจ) สำคัญต่อการทำงานบริการอย่างไร", options: ["ทำให้ลูกค้ารู้สึกว่าเราเข้าใจปัญหาของเขาจริงๆ", "ทำให้เราทำงานเร็วขึ้น", "ทำให้เราได้ทิปเยอะขึ้น", "ไม่สำคัญเท่าความเก่ง"], a: 0 },
+            { q: "ทฤษฎีบุคลิกภาพของ Sheldon แบ่งคนตามรูปร่าง ข้อใดคือคนอ้วน", options: ["Endomorph", "Mesomorph", "Ectomorph", "Xenomorph"], a: 0 },
+
+            // --- ชุดที่ 2 (ตัวอย่างบางส่วน) ---
+            { q: "การวาง \"ผ้าเช็ดปาก\" (Napkin) ไว้บนตัก ควรพับอย่างไร", options: ["กางออกทั้งหมดให้คลุมเข่า", "พับเป็นสามเหลี่ยมเอามุมแหลมชี้เข้าหาตัว", "พับครึ่ง (2 ทบ) หันด้านปลายเปิดออกด้านนอก", "ขยุ้มวางไว้เฉยๆ"], a: 2 },
+            { q: "หากต้องการเช็ดปากด้วยผ้าเช็ดปาก ควรใช้ส่วนใดของผ้า", options: ["ตรงกลางผ้า", "ขอบของผ้าด้านใน (เพื่อซ่อนรอยเปื้อน)", "มุมผ้าด้านนอกสุด", "ใช้ทิชชู่ส่วนตัวเช็ดแทน"], a: 1 },
+            { q: "ตามมารยาทการดื่มไวน์ หากพนักงานเสิร์ฟรินไวน์ให้ชิม ใครควรเป็นผู้ชิมคนแรก", options: ["สุภาพสตรีที่อาวุโสที่สุด", "เจ้าภาพ (เพื่อตรวจสอบคุณภาพไวน์ก่อนเสิร์ฟแขก)", "แขกเกียรติยศ", "ใครก็ได้"], a: 1 },
+            { q: "การจับแก้วไวน์ที่ถูกต้อง ควรจับที่ส่วนใด", options: ["ตัวแก้ว (Bowl)", "ปากแก้ว", "ก้านแก้ว (Stem) เพื่อไม่ให้อุณหภูมิมือไปกระทบรสชาติ", "ฐานแก้ว"], a: 2 },
+            { q: "\"ไวน์ขาว\" (White Wine) นิยมรับประทานคู่กับอาหารประเภทใด", options: ["เนื้อแดง, สเต็ก", "ปลา, สัตว์ปีก, อาหารทะเล", "ของหวาน", "ผลไม้รสเปรี้ยว"], a: 1 },
+            { q: "เมื่อทานสเต็ก หากต้องการหั่นเนื้อ ควรหั่นอย่างไร", options: ["หั่นทีเดียวให้หมดทั้งชิ้นแล้วค่อยทาน", "หั่นทีละชิ้นพอดีคำ แล้วทานทีละชิ้น", "ให้บริกรหั่นมาให้จากในครัว", "ใช้ส้อมฉีกเนื้อ"], a: 1 },
+            { q: "การรับประทาน \"ไก่มีกระดูก\" ในงานเลี้ยงที่เป็นทางการ (Formal) ควรปฏิบัติอย่างไร", options: ["ใช้มือหยิบแทะได้เลย", "ใช้มีดและส้อมเลาะเนื้อออกจากกระดูก", "ใช้กระดาษพันปลายกระดูกแล้วจับทาน", "ไม่ควรสั่งเมนูนี้"], a: 1 },
+            { q: "หากมีเศษอาหารติดฟันในระหว่างรับประทานอาหาร ควรทำอย่างไร", options: ["ใช้ไม้จิ้มฟันแคะที่โต๊ะโดยใช้มือป้อง", "ใช้นิ้วเขี่ยออกเบาๆ", "ดื่มน้ำกลั้วปากแรงๆ", "ขอตัวไปจัดการในห้องน้ำ"], a: 3 },
+            { q: "ซอร์เบต์ (Sorbet) คืออะไร และมักเสิร์ฟช่วงใดของมื้ออาหาร", options: ["ไอศกรีมกะทิ เสิร์ฟหลังของหวาน", "ไอศกรีมผลไม้ไม่ผสมนม เสิร์ฟคั่นรายการเพื่อล้างปาก", "ซุปข้น เสิร์ฟก่อนอาหารจานแรก", "เครื่องดื่มแอลกอฮอล์"], a: 1 },
+            { q: "การใช้ \"ช้อนกาแฟ\" ที่ถูกต้องคือข้อใด", options: ["ใช้ตักกาแฟดื่ม", "ใช้คนน้ำตาลและนมให้เข้ากัน แล้ววางพักไว้ในจานรอง", "ใช้คนแล้วคาไว้ในถ้วย", "ใช้เคาะขอบถ้วยเพื่อไล่ฟอง"], a: 1 },
+            { q: "การเดินผ่านผู้ใหญ่ในระยะใกล้ (เช่น ในสำนักงาน) ควรทำอย่างไร", options: ["เดินย่องเบาๆ", "เดินค้อมตัวลงเล็กน้อย (เดินก้มหลัง) พร้อมเก็บมือแนบลำตัว", "หยุดยืนตรงทำความเคารพทุกครั้ง", "วิ่งเหยาะๆ ให้พ้นทางเร็วๆ"], a: 1 },
+            { q: "ท่า \"เทพธิดา\" ใช้สำหรับการกราบพระของผู้ใด", options: ["ผู้ชาย", "ผู้หญิง (นั่งคุกเข่าราบ ปลายเท้าเหยียด)", "เด็กเท่านั้น", "พระสงฆ์"], a: 1 },
+            { q: "การรับของจากผู้ใหญ่ (ผู้ใหญ่ยืน - ผู้น้อยยืน) ควรปฏิบัติอย่างไร", options: ["ยื่นมือไปรับทันที", "เดินเข้าไปใกล้ ไหว้ 1 ครั้ง ก้าวเท้าขวาไปข้างหน้าแล้วรับของ", "คุกเข่ารับ", "ให้ผู้ใหญ่วางของลงก่อนแล้วค่อยหยิบ"], a: 1 },
+            { q: "มารยาทในการโดยสารรถยนต์ หากเจ้านายขับรถเอง เราควรนั่งตรงไหน", options: ["เบาะหลังซ้าย", "เบาะหลังขวา", "เบาะหน้าคู่คนขับ", "ตรงกลางเบาะหลัง"], a: 2 },
+            { q: "หากใช้แท็กซี่ ตำแหน่งที่นั่งที่ถือว่ามีเกียรติที่สุด (สำหรับเจ้านาย/แขก) คือที่ใด (ตามบริบทไทย)", options: ["เบาะหน้าคู่คนขับ", "เบาะหลังด้านขวา", "เบาะหลังตรงกลาง", "เบาะหลังซ้าย"], a: 3 },
+            { q: "การนัดหมายทางธุรกิจ หากเราเป็นผู้นัด ควรไปถึงเมื่อไหร่", options: ["ตรงเวลาเป๊ะ", "ก่อนเวลาประมาณ 5-10 นาที", "หลังเวลานัดเล็กน้อย", "เมื่อไหร่ก็ได้"], a: 1 },
+            { q: "การพิมพ์ข้อความด้วย \"สีแดง\" ในอีเมลธุรกิจ สื่อความหมายว่าอย่างไร", options: ["ความรัก", "ความสำคัญ เร่งด่วน หรือความโกรธ (ก้าวร้าว)", "ความสดใส", "ความร่ำรวย"], a: 1 },
+            { q: "\"First Impression\" (ความประทับใจแรกพบ) เกิดขึ้นจากสิ่งใดมากที่สุด", options: ["คำพูด (7%)", "น้ำเสียง (38%)", "ภาษากายและการแต่งกาย (55%)", "ความรู้"], a: 2 },
+            { q: "ผู้ชายที่ \"คอสั้น\" ควรหลีกเลี่ยงเสื้อแบบใด", options: ["เสื้อคอวี", "เสื้อคอเต่า หรือเสื้อปกตั้งสูงๆ", "เสื้อคอแบะ", "เสื้อเชิ้ตคอปกต่ำ"], a: 1 },
+            { q: "ความหมายของสี \"สีเทา\" ในทางจิตวิทยาการแต่งกายคืออะไร", options: ["ความร่าเริง", "ความสมดุล เป็นกลาง และมีความเป็นทางการสูง", "ความโศกเศร้า", "ความรัก"], a: 1 },
+            { q: "\"Monotone\" ในการแต่งกายหมายถึงอะไร", options: ["การใส่เสื้อผ้าหลายสีตัดกัน", "การใส่เสื้อผ้าสีเดียว หรือไล่เฉดสีในโทนเดียวกันทั้งชุด", "การใส่ลายดอก", "การใส่สีขาวดำเท่านั้น"], a: 1 },
+            { q: "ผู้หญิงรูปร่าง \"ทรงกระบอก\" (Ruler/Rectangle) ควรแต่งกายอย่างไรให้ดูมีสัดส่วน", options: ["ใส่ชุดตรงๆ ทื่อๆ", "หาเข็มขัดมาคาดเอว หรือใส่กระโปรงบานเพื่อสร้างมิติ", "ใส่เสื้อคอกลม", "ใส่กางเกงขาสั้น"], a: 1 },
+            { q: "สูทกระดุม 3 เม็ด (Three-button suit) ควรติดกระดุมอย่างไร", options: ["ติดทุกเม็ด", "ติดเม็ดกลาง (เม็ดบนอาจติดได้, เม็ดล่างห้ามติด)", "ติดเม็ดล่างสุดเม็ดเดียว", "ไม่ติดเลย"], a: 1 },
+            { q: "เสื้อเชิ้ตด้านในสำหรับใส่คู่กับสูทสีดำหรือกรมท่า ควรเป็นสีอะไรที่ปลอดภัยที่สุด", options: ["สีแดงสด", "สีขาว หรือ สีฟ้าอ่อน", "สีดำ", "ลายดอกชบา"], a: 1 },
+            { q: "เครื่องประดับ \"มุก\" (Pearl) ให้ความรู้สึกอย่างไรแก่ผู้สวมใส่", options: ["ทันสมัย เปรี้ยวจี๊ด", "สุภาพ อ่อนหวาน และคลาสสิก", "ดุดัน แข็งกร้าว", "ราคาถูก"], a: 1 },
+            { q: "การเลือกน้ำหอมสำหรับใส่ไปทำงาน ควรเป็นอย่างไร", options: ["กลิ่นฉุนรุนแรงเพื่อให้คนจำได้", "กลิ่นหอมอ่อนๆ สดชื่น ไม่รบกวนผู้อื่น", "ไม่ต้องอาบน้ำ ฉีดแต่น้ำหอม", "ใช้น้ำมันมวย"], a: 1 },
+            { q: "ผู้ชาย \"ลงพุง\" ควรเลือกกางเกงอย่างไร", options: ["กางเกงเอวต่ำใต้พุง", "กางเกงที่มีจีบหน้า (Pleats) เพื่อให้ขยายได้เวลานั่ง", "กางเกงสกินนี่ (Skinny)", "กางเกงขาสั้น"], a: 1 },
+            { q: "Accessories (เครื่องประดับ) ชิ้นใดที่ช่วย \"กำหนดเอว\" ให้ชัดเจนขึ้น", options: ["สร้อยคอ", "เข็มขัด (Belt)", "ต่างหู", "กำไลข้อมือ"], a: 1 },
+            { q: "การสวมแหวนนิ้วชี้ สื่อความหมายทางจิตวิทยา (ภาษากาย) ว่าอย่างไร", options: ["ความรัก", "อำนาจ ความเป็นผู้นำ หรือการสั่งการ", "ความคิดสร้างสรรค์", "ความร่ำรวย"], a: 1 },
+            { q: "ผู้ชายควรตัดผมบ่อยแค่ไหนเพื่อรักษาบุคลิกภาพ", options: ["ปีละ 1 ครั้ง", "ทุกๆ 3-4 สัปดาห์ (หรือเมื่อเริ่มยาวปิดหู)", "เมื่อมีคนทัก", "แล้วแต่อารมณ์"], a: 1 },
+            { q: "ถ้าเราเป็นคน \"ช่วงตัวสั้น ขายาว\" ควรแต่งกายอย่างไร", options: ["ใส่เสื้อเอวลอย", "ใส่เสื้อตัวยาวคลุมสะโพก หรือเอาเสื้อไว้นอกกางเกง", "ใส่กางเกงเอวสูงปรี๊ด", "ใส่เข็มขัดเส้นใหญ่ๆ คาดทับ"], a: 1 },
+            { q: "ทำไม \"ความสะอาด\" ถึงเป็นหัวใจสำคัญที่สุดของการแต่งกาย", options: ["เพราะไม่ต้องใช้เงินซื้อ", "เพราะแสดงถึงการดูแลเอาใจใส่ตัวเองและให้เกียรติผู้อื่น", "เพราะทำให้เสื้อผ้าหอม", "ถูกทุกข้อ"], a: 3 },
+            { q: "ใครคือบิดาแห่งจิตวิเคราะห์ (Psychoanalysis)", options: ["Abraham Maslow", "Sigmund Freud", "Carl Rogers", "John Watson"], a: 1 },
+            { q: "คนที่มีบุคลิกภาพแบบ \"Introvert\" (เก็บตัว) มีลักษณะเด่นอย่างไร", options: ["ชอบปาร์ตี้เสียงดัง", "ชอบอยู่เงียบๆ คนเดียว ชาร์จพลังงานจากโลกภายใน", "พูดมากตลอดเวลา", "ก้าวร้าว"], a: 1 },
+            { q: "คำว่า \"Sympathy\" ต่างจาก \"Empathy\" อย่างไร", options: ["Sympathy คือเห็นใจ, Empathy คือเข้าใจความรู้สึก", "ความหมายเหมือนกัน", "Sympathy คือโกรธ, Empathy คือเกลียด", "Sympathy ใช้กับสัตว์, Empathy ใช้กับคน"], a: 0 },
+            { q: "อาการ \"Burnout\" ในที่ทำงานหมายถึงอะไร", options: ["ไฟไหม้ที่ทำงาน", "ภาวะหมดไฟในการทำงาน เหนื่อยหน่าย หมดแรงจูงใจ", "การทำงานหนักเกินไปจนรวย", "การถูกไล่ออก"], a: 1 },
+            { q: "IQ (Intelligence Quotient) วัดความฉลาดด้านใด", options: ["อารมณ์", "สติปัญญา การคิดวิเคราะห์ ตรรกะ", "ศีลธรรม", "ร่างกาย"], a: 1 },
+            { q: "AQ (Adversity Quotient) หมายถึงความฉลาดด้านใด", options: ["ความฉลาดในการเล่นเกม", "ความฉลาดในการรับมือกับปัญหาและอุปสรรค", "ความฉลาดทางสังคม", "ความฉลาดทางดิจิทัล"], a: 1 },
+            { q: "ความเครียดแบบ \"Eustress\" คืออะไร", options: ["ความเครียดที่เป็นโทษ", "ความเครียดที่ดี (ความเครียดในระดับพอดี)", "ความเครียดจากการสอบตก", "ความเครียดจากการตกงาน"], a: 1 },
+            { q: "บุคคลที่มีความ \"ยืดหยุ่น\" (Resilience) ทางจิตใจ มีลักษณะอย่างไร", options: ["ล้มแล้วลุกได้เร็ว ฟื้นตัวจากความผิดหวังได้ไว", "ร่างกายอ่อนตัว", "เปลี่ยนใจง่าย", "ไม่มีจุดยืน"], a: 0 },
+            { q: "Mindfulness หมายถึงอะไร", options: ["การเหม่อลอย", "การมีสติรู้ตัว อยู่กับปัจจุบัน", "การคิดฟุ้งซ่าน", "การนอนหลับ"], a: 1 },
+            { q: "หากเกิดความขัดแย้งในที่ทำงาน การใช้ \"I Message\" มีประโยชน์อย่างไร", options: ["เป็นการบอกความรู้สึกของ \"ฉัน\" โดยไม่ตำหนิอีกฝ่าย", "เป็นการสั่งให้คนอื่นทำตาม", "เป็นการด่ากราด", "เป็นการยกยอตัวเอง"], a: 0 },
+            { q: "การ \"ให้อภัย\" (Forgiveness) มีผลดีต่อใครมากที่สุด", options: ["คนที่ทำผิด", "ตัวเราเอง (ปลดปล่อยความทุกข์ใจ)", "ตำรวจ", "ศาล"], a: 1 },
+            { q: "Maslow กล่าวว่า ความต้องการขั้นสูงสุดของมนุษย์จะเกิดขึ้นได้เมื่อใด", options: ["เมื่อรวยล้นฟ้า", "เมื่อความต้องการขั้นพื้นฐานได้รับการตอบสนองแล้ว", "เมื่อเกิดมา", "ไม่สามารถเกิดขึ้นได้จริง"], a: 1 },
+            { q: "บุคลิกภาพแบบ \"Type A\" (ใจร้อน, แข่งขัน, เร่งรีบ) เสี่ยงต่อโรคใด", options: ["โรคกระเพาะ", "โรคหัวใจ", "โรคหวัด", "โรคผิวหนัง"], a: 1 },
+            { q: "\"ใจเขาใจเรา\" ตรงกับหลักธรรมข้อใด", options: ["สังคหวัตถุ 4", "อริยสัจ 4", "พรหมวิหาร 4 (เมตตา กรุณา มุทิตา อุเบกขา)", "อิทธิบาท 4"], a: 2 },
+            { q: "วิธีระบายความเครียดที่ ไม่เหมาะสม", options: ["ออกกำลังกาย", "พูดคุยกับเพื่อนสนิท", "ดื่มแอลกอฮอล์หรือสูบบุหรี่จัด", "ดูหนังฟังเพลง"], a: 2 },
+            { q: "\"Self-Esteem\" หมายถึงอะไร", options: ["ความเห็นแก่ตัว", "การเห็นคุณค่าในตนเอง / ความภูมิใจในตนเอง", "การดูถูกคนอื่น", "การมั่นใจเกินเหตุ"], a: 1 },
+            { q: "\"จิตวิทยาเชิงบวก\" (Positive Psychology) เน้นเรื่องใด", options: ["การรักษาโรคจิต", "การส่งเสริมจุดแข็งและความสุขของมนุษย์", "การสะกดจิต", "การวิเคราะห์ความฝัน"], a: 1 }
+        ];
+
+        // --- COMPONENTS ---
+        const Icons = {
+            Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+            Book: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
+            Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="green" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="red" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+            Home: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        };
+
+        const MenuScreen = ({ onStart }) => (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-900 to-purple-800 p-4">
+                <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-4xl w-full flex flex-col md:flex-row">
+                    <div className="flex-1 p-10 flex flex-col items-center text-center border-b md:border-b-0 md:border-r border-gray-100 bg-white hover:bg-red-50 transition-colors group cursor-pointer" onClick={() => onStart('exam')}>
+                        <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 text-red-600 group-hover:scale-110 transition-transform shadow-sm">
+                            <Icons.Clock />
+                        </div>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">โหมดสอบจริง</h2>
+                        <p className="text-gray-500 mb-6 text-sm">Simulator เหมือนจริง</p>
+                        <ul className="text-gray-600 text-left space-y-3 mb-8 text-sm bg-gray-50 p-4 rounded-xl w-full">
+                            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-red-500 rounded-full"></span>จับเวลา 90 นาที</li>
+                            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-red-500 rounded-full"></span>สุ่ม {EXAM_CONFIG.totalQuestionsInExam} ข้อ จากคลัง</li>
+                            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-red-500 rounded-full"></span>ส่งคำตอบเพื่อดูคะแนน</li>
+                        </ul>
+                        <button className="mt-auto px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-lg shadow-lg w-full transition-transform hover:-translate-y-1">เริ่มสอบ</button>
+                    </div>
+                    <div className="flex-1 p-10 flex flex-col items-center text-center bg-white hover:bg-green-50 transition-colors group cursor-pointer" onClick={() => onStart('practice')}>
+                        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600 group-hover:scale-110 transition-transform shadow-sm">
+                            <Icons.Book />
+                        </div>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-2">โหมดฝึกฝน</h2>
+                         <p className="text-gray-500 mb-6 text-sm">เรียนรู้และทบทวน</p>
+                         <ul className="text-gray-600 text-left space-y-3 mb-8 text-sm bg-gray-50 p-4 rounded-xl w-full">
+                            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-green-500 rounded-full"></span>ทำทุกข้อในคลัง ({QUESTION_POOL.length} ข้อ)</li>
+                            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-green-500 rounded-full"></span>ไม่จับเวลา</li>
+                            <li className="flex items-center gap-2"><span className="w-2 h-2 bg-green-500 rounded-full"></span>กดดูเฉลยได้ทันที</li>
+                        </ul>
+                        <button className="mt-auto px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-lg shadow-lg w-full transition-transform hover:-translate-y-1">เริ่มฝึกฝน</button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const ExamInterface = ({ mode, questions, onFinish, onHome }) => {
+            const [userAnswers, setUserAnswers] = useState({});
+            const [timeLeft, setTimeLeft] = useState(EXAM_CONFIG.duration);
+            const timerRef = useRef(null);
+
+            const isExamMode = mode === 'exam';
+
+            useEffect(() => {
+                if (isExamMode) {
+                    timerRef.current = setInterval(() => {
+                        setTimeLeft(prev => {
+                            if (prev <= 1) {
+                                clearInterval(timerRef.current);
+                                onFinish(userAnswers, true);
+                                return 0;
+                            }
+                            return prev - 1;
+                        });
+                    }, 1000);
+                }
+                return () => clearInterval(timerRef.current);
+            }, [isExamMode, onFinish, userAnswers]);
+
+            // Format Time
+            const formatTime = (seconds) => {
+                const m = Math.floor(seconds / 60);
+                const s = seconds % 60;
+                return `${m}:${s < 10 ? '0' : ''}${s}`;
+            };
+
+            const progress = (Object.keys(userAnswers).length / questions.length) * 100;
+
+            return (
+                <div className={`min-h-screen pb-20 bg-gray-50 ${isExamMode ? 'no-select' : ''}`}>
+                    {/* Header */}
+                    <header className={`${isExamMode ? 'bg-indigo-800' : 'bg-teal-700'} text-white sticky top-0 z-50 shadow-lg transition-colors`}>
+                        <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <button onClick={onHome} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"><Icons.Home/></button>
+                                <div>
+                                    <h1 className="font-bold text-lg leading-tight">{isExamMode ? 'สอบปลายภาค GEN1202' : 'ฝึกฝน GEN1202'}</h1>
+                                    <p className="text-xs opacity-80 font-light">{isExamMode ? 'กำลังจับเวลา' : 'แบบฝึกหัดทบทวน'}</p>
+                                </div>
+                            </div>
+                            
+                            {isExamMode && (
+                                <div className={`flex items-center gap-2 font-mono text-xl font-bold px-4 py-2 rounded-lg ${timeLeft < 300 ? 'bg-red-500 animate-pulse' : 'bg-black/20'}`}>
+                                    <Icons.Clock /> {formatTime(timeLeft)}
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-3">
+                                <div className="hidden md:block text-right text-xs mr-2">
+                                    <p>ทำไปแล้ว</p>
+                                    <p className="font-bold">{Object.keys(userAnswers).length} / {questions.length}</p>
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        if(!isExamMode || window.confirm('ยืนยันที่จะส่งคำตอบ?')) onFinish(userAnswers, false);
+                                    }}
+                                    className="bg-white text-indigo-900 hover:bg-gray-100 px-6 py-2 rounded-full text-sm font-bold shadow transition-transform active:scale-95"
+                                >
+                                    {isExamMode ? 'ส่งข้อสอบ' : 'สรุปผล'}
+                                </button>
+                            </div>
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="h-1.5 bg-black/20 w-full">
+                            <div className="h-full bg-yellow-400 transition-all duration-500" style={{width: `${progress}%`}}></div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+                        {questions.map((q, idx) => (
+                            <div key={idx} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 transition-shadow hover:shadow-md">
+                                <div className="flex gap-4">
+                                    <div className="flex-shrink-0 w-8 h-8 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center font-bold text-sm">
+                                        {idx + 1}
+                                    </div>
+                                    <div className="flex-grow">
+                                        <h3 className="text-lg font-medium text-gray-800 mb-4 leading-relaxed">{q.q}</h3>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {q.options.map((opt, optIdx) => (
+                                                <button
+                                                    key={optIdx}
+                                                    onClick={() => setUserAnswers(prev => ({...prev, [idx]: optIdx}))}
+                                                    className={`p-3 text-left rounded-lg border transition-all relative ${
+                                                        userAnswers[idx] === optIdx 
+                                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 font-medium shadow-sm ring-1 ring-indigo-500' 
+                                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                    }`}
+                                                >
+                                                    <span className="mr-2 opacity-60 font-bold">{['ก', 'ข', 'ค', 'ง'][optIdx]}.</span>
+                                                    {opt}
+                                                    {userAnswers[idx] === optIdx && <div className="absolute right-3 top-3 text-indigo-500"><Icons.Check/></div>}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        {/* เฉลยสำหรับโหมดฝึกฝน */}
+                                        {!isExamMode && (
+                                            <PracticeAnswerReveal answer={q.a} options={q.options} />
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </main>
+                </div>
+            );
+        };
+
+        const PracticeAnswerReveal = ({ answer, options }) => {
+            const [show, setShow] = useState(false);
+            return (
+                <div className="mt-4 pt-3 border-t border-dashed border-gray-200">
+                    <button onClick={() => setShow(!show)} className="text-sm text-teal-600 hover:text-teal-800 font-bold flex items-center gap-1 transition-colors">
+                        <Icons.Eye /> {show ? 'ซ่อนเฉลย' : 'ดูเฉลย'}
+                    </button>
+                    {show && (
+                        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 animate-in fade-in slide-in-from-top-1 text-sm">
+                            <span className="font-bold">คำตอบที่ถูกต้อง:</span> ข้อ {['ก', 'ข', 'ค', 'ง'][answer]} ({options[answer]})
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ResultScreen = ({ questions, userAnswers, onRestart }) => {
+            const score = questions.reduce((acc, q, idx) => acc + (userAnswers[idx] === q.a ? 1 : 0), 0);
+            const percentage = Math.round((score / questions.length) * 100);
+            
+            let feedback = "";
+            let colorClass = "";
+            if (percentage >= 80) { feedback = "ยอดเยี่ยม! (A)"; colorClass = "text-green-600"; }
+            else if (percentage >= 60) { feedback = "ผ่านเกณฑ์ (C+)"; colorClass = "text-yellow-600"; }
+            else { feedback = "พยายามอีกนิดนะ (F)"; colorClass = "text-red-600"; }
+
+            return (
+                <div className="min-h-screen bg-gray-100 p-4 md:p-8">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-8">
+                            <div className="bg-indigo-900 text-white p-8 text-center relative overflow-hidden">
+                                <div className="relative z-10">
+                                    <h2 className="text-3xl font-bold mb-2">สรุปผลการทดสอบ</h2>
+                                    <p className="opacity-80">คะแนนของคุณ</p>
+                                    <div className="text-6xl font-bold my-4">{score} <span className="text-2xl font-normal opacity-60">/ {questions.length}</span></div>
+                                    <div className={`inline-block px-4 py-1 rounded-full bg-white font-bold text-lg ${colorClass}`}>{feedback} ({percentage}%)</div>
+                                </div>
+                            </div>
+                            <div className="p-6 bg-gray-50 flex justify-center">
+                                <button onClick={onRestart} className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg transition-transform hover:-translate-y-1">กลับสู่หน้าหลัก / สอบใหม่</button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            <h3 className="text-xl font-bold text-gray-700 ml-2">เฉลยละเอียด</h3>
+                            {questions.map((q, idx) => {
+                                const uAns = userAnswers[idx];
+                                const isCorrect = uAns === q.a;
+                                return (
+                                    <div key={idx} className={`bg-white rounded-xl shadow-sm border-l-8 p-6 ${isCorrect ? 'border-green-500' : 'border-red-500'}`}>
+                                        <div className="flex gap-3 mb-3">
+                                            <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}>
+                                                {isCorrect ? <Icons.Check /> : <Icons.X />}
+                                            </span>
+                                            <h4 className="text-lg font-medium text-gray-800">{q.q}</h4>
+                                        </div>
+                                        
+                                        <div className="ml-11 space-y-2">
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-gray-500 min-w-[60px]">คุณตอบ:</span>
+                                                <span className={`font-bold ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {uAns !== undefined ? `${['ก', 'ข', 'ค', 'ง'][uAns]}. ${q.options[uAns]}` : 'ไม่ได้ตอบ'}
+                                                </span>
+                                            </div>
+                                            {!isCorrect && (
+                                                <div className="flex items-center gap-2 text-sm bg-green-50 p-2 rounded-lg border border-green-100">
+                                                    <span className="text-green-700 font-bold min-w-[60px]">เฉลย:</span>
+                                                    <span className="text-green-800">
+                                                        {['ก', 'ข', 'ค', 'ง'][q.a]}. {q.options[q.a]}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [gameState, setGameState] = useState('menu');
+            const [currentQuestions, setCurrentQuestions] = useState([]);
+            const [finalAnswers, setFinalAnswers] = useState({});
+            const [mode, setMode] = useState('');
+
+            const startExam = (selectedMode) => {
+                setMode(selectedMode);
+                let qSet = [];
+                
+                if (selectedMode === 'exam') {
+                    // Randomize & Slice
+                    const shuffled = [...QUESTION_POOL].sort(() => 0.5 - Math.random());
+                    qSet = shuffled.slice(0, EXAM_CONFIG.totalQuestionsInExam);
+                } else {
+                    // Practice: All questions
+                    qSet = QUESTION_POOL;
+                }
+
+                setCurrentQuestions(qSet);
+                setGameState('exam');
+                window.scrollTo(0, 0);
+            };
+
+            const finishExam = (answers, isTimeOut) => {
+                setFinalAnswers(answers);
+                setGameState('result');
+                if (isTimeOut) alert("หมดเวลาการสอบ!");
+                window.scrollTo(0, 0);
+            };
+
+            if (gameState === 'menu') return <MenuScreen onStart={startExam} />;
+            if (gameState === 'exam') return <ExamInterface mode={mode} questions={currentQuestions} onFinish={finishExam} onHome={() => setGameState('menu')} />;
+            if (gameState === 'result') return <ResultScreen questions={currentQuestions} userAnswers={finalAnswers} onRestart={() => setGameState('menu')} />;
+            return null;
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
