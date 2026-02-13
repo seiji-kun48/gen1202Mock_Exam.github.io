@@ -506,54 +506,46 @@
                 </div>
             </div>
         );
+
         const App = () => {
             const [gameState, setGameState] = useState('menu');
-            const [mode, setMode] = useState(null);
-            const [currentExamData, setCurrentExamData] = useState(null);
+            const [currentQuestions, setCurrentQuestions] = useState([]); // แก้กลับมาใช้ currentQuestions
             const [finalAnswers, setFinalAnswers] = useState({});
+            const [mode, setMode] = useState('');
             
             // State สำหรับ Popup
             const [showDisclaimer, setShowDisclaimer] = useState(false);
 
-            // ตรวจสอบว่าเคยอ่าน Popup หรือยังตอนเข้าเว็บครั้งแรก
             useEffect(() => {
-                const hasSeen = localStorage.getItem('jp_exam_disclaimer_seen_v1');
+                // ตรวจสอบว่าเคยอ่าน Popup หรือยัง (ใช้ชื่อ key เฉพาะของ gen1202 เพื่อไม่ให้ชนกับเว็บอื่น)
+                const hasSeen = localStorage.getItem('gen1202_exam_disclaimer_seen_v1');
                 if (!hasSeen) {
                     setShowDisclaimer(true);
                 }
             }, []);
 
             const handleCloseDisclaimer = () => {
-                // บันทึกว่าอ่านแล้ว จะได้ไม่ขึ้นซ้ำ (ถ้าอยากให้ขึ้นทุกครั้งให้ลบบรรทัด localStorage นี้ทิ้ง)
-                localStorage.setItem('jp_exam_disclaimer_seen_v1', 'true');
+                localStorage.setItem('gen1202_exam_disclaimer_seen_v1', 'true');
                 setShowDisclaimer(false);
             };
 
             const startExam = (selectedMode) => {
-                let data = {};
-                try {
-                    if (selectedMode === 'practice_all') {
-                        data = QUESTION_POOL;
-                    } else {
-                        // Randomize
-                        Object.keys(QUESTION_POOL).forEach(key => {
-                            const pool = QUESTION_POOL[key];
-                            const count = EXAM_CONFIG.counts[key] || 5;
-                            const safeCount = Math.min(count, pool.questions.length);
-                            data[key] = {
-                                ...pool,
-                                questions: getRandomQuestions(pool.questions, safeCount)
-                            };
-                        });
-                    }
-                    setCurrentExamData(data);
-                    setMode(selectedMode);
-                    setGameState('exam');
-                    window.scrollTo(0, 0);
-                } catch (error) {
-                    console.error("Error starting exam:", error);
-                    alert("เกิดข้อผิดพลาดในการเริ่มข้อสอบ กรุณาลองใหม่อีกครั้ง");
+                setMode(selectedMode);
+                let qSet = [];
+                
+                // ใช้ Logic เดิมของ GEN1202
+                if (selectedMode === 'exam') {
+                    // สุ่มและตัดจำนวนข้อ
+                    const shuffled = [...QUESTION_POOL].sort(() => 0.5 - Math.random());
+                    qSet = shuffled.slice(0, EXAM_CONFIG.totalQuestionsInExam);
+                } else {
+                    // โหมดฝึกฝน: เอามาทุกข้อ
+                    qSet = QUESTION_POOL;
                 }
+
+                setCurrentQuestions(qSet);
+                setGameState('exam');
+                window.scrollTo(0, 0);
             };
 
             const finishExam = (answers, isTimeOut) => {
@@ -563,11 +555,15 @@
                 window.scrollTo(0, 0);
             };
 
-            // Logic การแสดงผลหน้าจอ
+            // Logic การแสดงผลหน้าจอ (แก้ไขชื่อ Component ให้ถูกต้อง)
             let content;
-            if (gameState === 'menu') content = <MenuScreen onStart={startExam} />;
-            else if (gameState === 'exam') content = <ExamInterface mode={mode} examData={currentExamData} onFinish={finishExam} onHome={() => setGameState('menu')} />;
-            else if (gameState === 'result') content = <ResultSummary examData={currentExamData} userAnswers={finalAnswers} onRestart={() => setGameState('menu')} />;
+            if (gameState === 'menu') {
+                content = <MenuScreen onStart={startExam} />;
+            } else if (gameState === 'exam') {
+                content = <ExamInterface mode={mode} questions={currentQuestions} onFinish={finishExam} onHome={() => setGameState('menu')} />;
+            } else if (gameState === 'result') {
+                content = <ResultScreen questions={currentQuestions} userAnswers={finalAnswers} onRestart={() => setGameState('menu')} />;
+            }
 
             return (
                 <>
@@ -576,6 +572,12 @@
                 </>
             );
         };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
