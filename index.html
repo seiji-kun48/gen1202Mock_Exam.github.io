@@ -21,6 +21,13 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: scale(0.3); }
+            50% { opacity: 1; transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -32,7 +39,7 @@
         // --- ตั้งค่าการสอบ ---
         const EXAM_CONFIG = {
             duration: 90 * 60, // 90 นาที
-            totalQuestionsInExam: 60, // สุ่มมา 60 ข้อ จาก 180 ข้อ (ปรับเลขนี้ได้หากต้องการสอบเยอะขึ้น)
+            totalQuestionsInExam: 60, // สุ่มมา 60 ข้อ จาก 180 ข้อ
         };
 
         // --- ฐานข้อมูลข้อสอบ 180 ข้อ (ชุด 1 + ชุด 2) ---
@@ -43,7 +50,7 @@
             { q: "เมื่อได้รับนามบัตรจากผู้อื่น มารยาทที่ถูกต้องที่สุดคือข้อใด", options: ["รีบเก็บใส่กระเป๋าทันทีเพื่อความรวดเร็ว", "ใช้มือซ้ายรับและส่งต่อให้เลขา", "ใช้มือขวารับ (หรือสองมือ) อ่านทวนชื่อและรายละเอียดสักครู่ก่อนเก็บ", "เขียนวันที่ได้รับลงบนนามบัตรทันทีต่อหน้าเจ้าของ"], a: 2 },
             { q: "ระยะห่างทางสังคม (Social Zone) ในการติดต่อธุรกิจหรือสนทนากับคนไม่คุ้นเคย คือระยะใด", options: ["0 – 2 ฟุต", "2 – 4 ฟุต", "4 – 12 ฟุต", "12 ฟุตขึ้นไป"], a: 2 },
             { q: "การนั่งเก้าอี้ในพิธีการที่เป็นทางการ สุภาพสตรีควรปฏิบัติอย่างไร", options: ["นั่งไขว่ห้างได้ถ้าเมื่อย", "นั่งเต็มก้น หลังพิงพนัก เข่าชิดกัน", "นั่งเพียงครึ่งเก้าอี้เพื่อพร้อมลุกเสมอ", "นั่งเอนหลังตามสบาย"], a: 1 },
-            { q: "ข้อใด *ไม่ใช่* มารยาทในการเดินนำผู้ใหญ่", options: ["เดินเยื้องไปทางซ้ายของผู้ใหญ่เล็กน้อย (ฐานะผู้ติดตาม)", "เดินนำหน้าในระยะห่างพอสมควร", "เดินตัวตรงตามปกติ ไม่ต้องค้อมตัว", "ระมัดระวังเส้นทางให้ผู้ใหญ่"], a: 0 }, // แก้ไขตามเฉลยในเอกสาร (ตอบ ก)
+            { q: "ข้อใด *ไม่ใช่* มารยาทในการเดินนำผู้ใหญ่", options: ["เดินเยื้องไปทางซ้ายของผู้ใหญ่เล็กน้อย (ฐานะผู้ติดตาม)", "เดินนำหน้าในระยะห่างพอสมควร", "เดินตัวตรงตามปกติ ไม่ต้องค้อมตัว", "ระมัดระวังเส้นทางให้ผู้ใหญ่"], a: 0 },
             { q: "เมื่อรับประทานอาหารชุดตะวันตก หากต้องการพักทานอาหารชั่วคราว ควรวางมีดและส้อมอย่างไร", options: ["วางขนานกันไว้ขอบจานด้านขวา", "วางปลายมีดและส้อมชนกันเป็นรูปสามเหลี่ยม (หรือกากบาท) บนจาน", "วางไว้นอกจานบนโต๊ะ", "ถือค้างไว้ในมือ"], a: 1 },
             { q: "\"ค็อกเทล\" (Cocktail) ในงานเลี้ยง เดิมทีหมายถึงเครื่องดื่มประเภทใด", options: ["เหล้าผสมผลไม้หรือเครื่องดื่มอื่นๆ", "ไวน์แดง", "แชมเปญ", "เบียร์สด"], a: 0 },
             { q: "แก้วไวน์แดง (Red Wine Glass) มักมีลักษณะอย่างไรเมื่อเทียบกับแก้วไวน์ขาว", options: ["ทรงผอมสูงกว่า", "ตัวแก้ว (Bowl) ใหญ่และป่องกว่า", "ขนาดเล็กกว่ามาก", "ไม่มีก้านแก้ว"], a: 1 },
@@ -289,7 +296,6 @@
                 return () => clearInterval(timerRef.current);
             }, [isExamMode, onFinish, userAnswers]);
 
-            // Format Time
             const formatTime = (seconds) => {
                 const m = Math.floor(seconds / 60);
                 const s = seconds % 60;
@@ -300,7 +306,6 @@
 
             return (
                 <div className={`min-h-screen pb-20 bg-gray-50 ${isExamMode ? 'no-select' : ''}`}>
-                    {/* Header */}
                     <header className={`${isExamMode ? 'bg-indigo-800' : 'bg-teal-700'} text-white sticky top-0 z-50 shadow-lg transition-colors`}>
                         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
                             <div className="flex items-center gap-4">
@@ -332,7 +337,6 @@
                                 </button>
                             </div>
                         </div>
-                        {/* Progress Bar */}
                         <div className="h-1.5 bg-black/20 w-full">
                             <div className="h-full bg-yellow-400 transition-all duration-500" style={{width: `${progress}%`}}></div>
                         </div>
@@ -366,7 +370,6 @@
                                             ))}
                                         </div>
 
-                                        {/* เฉลยสำหรับโหมดฝึกฝน */}
                                         {!isExamMode && (
                                             <PracticeAnswerReveal answer={q.a} options={q.options} />
                                         )}
@@ -460,13 +463,10 @@
                 </div>
             );
         };
-// --- POPUP COMPONENT ---
+
         const DisclaimerModal = ({ onClose }) => (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                {/* Backdrop with blur */}
                 <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
-                
-                {/* Modal Content */}
                 <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 md:p-8 relative z-10 animate-[bounceIn_0.5s_ease-out] transform transition-all scale-100">
                     <div className="text-center mb-6">
                         <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
@@ -475,33 +475,19 @@
                         <h3 className="text-2xl font-bold text-gray-800 mb-2">ข้อควรรู้ก่อนเริ่มใช้งาน</h3>
                         <div className="h-1 w-20 bg-yellow-400 mx-auto rounded-full"></div>
                     </div>
-
                     <div className="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
                         <div className="flex gap-3 items-start bg-blue-50 p-4 rounded-xl border border-blue-100">
                             <span className="text-xl">🤖</span>
-                            <p>
-                                <strong>ที่มาของข้อสอบ:</strong> คำถามและเฉลยถูกสร้างขึ้นโดย <strong>NotebookLM</strong> (AI) โดยอ้างอิงจากไฟล์เอกสารประกอบการเรียน 
-                                <span className="text-red-500 font-bold"> อาจมีความคลาดเคลื่อนหรือไม่ถูกต้อง 100%</span> โปรดใช้เพื่อการฝึกฝนและทบทวนความรู้เท่านั้น
-                            </p>
+                            <p><strong>ที่มาของข้อสอบ:</strong> คำถามและเฉลยถูกสร้างขึ้นโดย <strong>AI</strong> โดยอ้างอิงจากเอกสารประกอบการเรียน โปรดใช้เพื่อการฝึกฝนและทบทวนความรู้เท่านั้น</p>
                         </div>
-
                         <div className="flex gap-3 items-start bg-purple-50 p-4 rounded-xl border border-purple-100">
                             <span className="text-xl">💻</span>
-                            <p>
-                                <strong>ระบบเว็บไซต์:</strong> เว็บไซต์นี้ถูกเขียนขึ้นโดยใช้ <strong>Gemini</strong> (AI) 
-                                หากพบข้อผิดพลาดในเฉลย การตัดเกรด หรือการแสดงผล ทางผู้จัดทำขออภัยมา ณ ที่นี้
-                            </p>
+                            <p><strong>ระบบเว็บไซต์:</strong> เว็บไซต์นี้ถูกเขียนขึ้นโดยใช้ <strong>Gemini</strong> หากพบข้อผิดพลาดต้องขออภัยมา ณ ที่นี้</p>
                         </div>
                     </div>
-
-                    <button 
-                        onClick={onClose}
-                        className="mt-8 w-full bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0 text-lg flex items-center justify-center gap-2 group"
-                    >
+                    <button onClick={onClose} className="mt-8 w-full bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0 text-lg flex items-center justify-center gap-2 group">
                         <span>รับทราบและเข้าใช้งาน</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </button>
                 </div>
             </div>
@@ -509,19 +495,14 @@
 
         const App = () => {
             const [gameState, setGameState] = useState('menu');
-            const [currentQuestions, setCurrentQuestions] = useState([]); // แก้กลับมาใช้ currentQuestions
+            const [currentQuestions, setCurrentQuestions] = useState([]);
             const [finalAnswers, setFinalAnswers] = useState({});
             const [mode, setMode] = useState('');
-            
-            // State สำหรับ Popup
             const [showDisclaimer, setShowDisclaimer] = useState(false);
 
             useEffect(() => {
-                // ตรวจสอบว่าเคยอ่าน Popup หรือยัง (ใช้ชื่อ key เฉพาะของ gen1202 เพื่อไม่ให้ชนกับเว็บอื่น)
                 const hasSeen = localStorage.getItem('gen1202_exam_disclaimer_seen_v1');
-                if (!hasSeen) {
-                    setShowDisclaimer(true);
-                }
+                if (!hasSeen) setShowDisclaimer(true);
             }, []);
 
             const handleCloseDisclaimer = () => {
@@ -532,17 +513,12 @@
             const startExam = (selectedMode) => {
                 setMode(selectedMode);
                 let qSet = [];
-                
-                // ใช้ Logic เดิมของ GEN1202
                 if (selectedMode === 'exam') {
-                    // สุ่มและตัดจำนวนข้อ
                     const shuffled = [...QUESTION_POOL].sort(() => 0.5 - Math.random());
                     qSet = shuffled.slice(0, EXAM_CONFIG.totalQuestionsInExam);
                 } else {
-                    // โหมดฝึกฝน: เอามาทุกข้อ
                     qSet = QUESTION_POOL;
                 }
-
                 setCurrentQuestions(qSet);
                 setGameState('exam');
                 window.scrollTo(0, 0);
@@ -555,29 +531,19 @@
                 window.scrollTo(0, 0);
             };
 
-            // Logic การแสดงผลหน้าจอ (แก้ไขชื่อ Component ให้ถูกต้อง)
             let content;
-            if (gameState === 'menu') {
-                content = <MenuScreen onStart={startExam} />;
-            } else if (gameState === 'exam') {
-                content = <ExamInterface mode={mode} questions={currentQuestions} onFinish={finishExam} onHome={() => setGameState('menu')} />;
-            } else if (gameState === 'result') {
-                content = <ResultScreen questions={currentQuestions} userAnswers={finalAnswers} onRestart={() => setGameState('menu')} />;
-            }
+            if (gameState === 'menu') content = <MenuScreen onStart={startExam} />;
+            else if (gameState === 'exam') content = <ExamInterface mode={mode} questions={currentQuestions} onFinish={finishExam} onHome={() => setGameState('menu')} />;
+            else if (gameState === 'result') content = <ResultScreen questions={currentQuestions} userAnswers={finalAnswers} onRestart={() => setGameState('menu')} />;
 
             return (
-                <>
+                <React.Fragment>
                     {showDisclaimer && <DisclaimerModal onClose={handleCloseDisclaimer} />}
                     {content}
-                </>
+                </React.Fragment>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
