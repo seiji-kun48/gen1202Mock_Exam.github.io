@@ -460,29 +460,100 @@
                 </div>
             );
         };
+// --- POPUP COMPONENT ---
+        const DisclaimerModal = ({ onClose }) => (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                {/* Backdrop with blur */}
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+                
+                {/* Modal Content */}
+                <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 md:p-8 relative z-10 animate-[bounceIn_0.5s_ease-out] transform transition-all scale-100">
+                    <div className="text-center mb-6">
+                        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                            ⚠️
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-800 mb-2">ข้อควรรู้ก่อนเริ่มใช้งาน</h3>
+                        <div className="h-1 w-20 bg-yellow-400 mx-auto rounded-full"></div>
+                    </div>
 
+                    <div className="space-y-4 text-gray-600 leading-relaxed text-sm md:text-base">
+                        <div className="flex gap-3 items-start bg-blue-50 p-4 rounded-xl border border-blue-100">
+                            <span className="text-xl">🤖</span>
+                            <p>
+                                <strong>ที่มาของข้อสอบ:</strong> คำถามและเฉลยถูกสร้างขึ้นโดย <strong>NotebookLM</strong> (AI) โดยอ้างอิงจากไฟล์เอกสารประกอบการเรียน 
+                                <span className="text-red-500 font-bold"> อาจมีความคลาดเคลื่อนหรือไม่ถูกต้อง 100%</span> โปรดใช้เพื่อการฝึกฝนและทบทวนความรู้เท่านั้น
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3 items-start bg-purple-50 p-4 rounded-xl border border-purple-100">
+                            <span className="text-xl">💻</span>
+                            <p>
+                                <strong>ระบบเว็บไซต์:</strong> เว็บไซต์นี้ถูกเขียนขึ้นโดยใช้ <strong>Gemini</strong> (AI) 
+                                หากพบข้อผิดพลาดในเฉลย การตัดเกรด หรือการแสดงผล ทางผู้จัดทำขออภัยมา ณ ที่นี้
+                            </p>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={onClose}
+                        className="mt-8 w-full bg-gray-900 hover:bg-black text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0 text-lg flex items-center justify-center gap-2 group"
+                    >
+                        <span>รับทราบและเข้าใช้งาน</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        );
         const App = () => {
             const [gameState, setGameState] = useState('menu');
-            const [currentQuestions, setCurrentQuestions] = useState([]);
+            const [mode, setMode] = useState(null);
+            const [currentExamData, setCurrentExamData] = useState(null);
             const [finalAnswers, setFinalAnswers] = useState({});
-            const [mode, setMode] = useState('');
+            
+            // State สำหรับ Popup
+            const [showDisclaimer, setShowDisclaimer] = useState(false);
+
+            // ตรวจสอบว่าเคยอ่าน Popup หรือยังตอนเข้าเว็บครั้งแรก
+            useEffect(() => {
+                const hasSeen = localStorage.getItem('jp_exam_disclaimer_seen_v1');
+                if (!hasSeen) {
+                    setShowDisclaimer(true);
+                }
+            }, []);
+
+            const handleCloseDisclaimer = () => {
+                // บันทึกว่าอ่านแล้ว จะได้ไม่ขึ้นซ้ำ (ถ้าอยากให้ขึ้นทุกครั้งให้ลบบรรทัด localStorage นี้ทิ้ง)
+                localStorage.setItem('jp_exam_disclaimer_seen_v1', 'true');
+                setShowDisclaimer(false);
+            };
 
             const startExam = (selectedMode) => {
-                setMode(selectedMode);
-                let qSet = [];
-                
-                if (selectedMode === 'exam') {
-                    // Randomize & Slice
-                    const shuffled = [...QUESTION_POOL].sort(() => 0.5 - Math.random());
-                    qSet = shuffled.slice(0, EXAM_CONFIG.totalQuestionsInExam);
-                } else {
-                    // Practice: All questions
-                    qSet = QUESTION_POOL;
+                let data = {};
+                try {
+                    if (selectedMode === 'practice_all') {
+                        data = QUESTION_POOL;
+                    } else {
+                        // Randomize
+                        Object.keys(QUESTION_POOL).forEach(key => {
+                            const pool = QUESTION_POOL[key];
+                            const count = EXAM_CONFIG.counts[key] || 5;
+                            const safeCount = Math.min(count, pool.questions.length);
+                            data[key] = {
+                                ...pool,
+                                questions: getRandomQuestions(pool.questions, safeCount)
+                            };
+                        });
+                    }
+                    setCurrentExamData(data);
+                    setMode(selectedMode);
+                    setGameState('exam');
+                    window.scrollTo(0, 0);
+                } catch (error) {
+                    console.error("Error starting exam:", error);
+                    alert("เกิดข้อผิดพลาดในการเริ่มข้อสอบ กรุณาลองใหม่อีกครั้ง");
                 }
-
-                setCurrentQuestions(qSet);
-                setGameState('exam');
-                window.scrollTo(0, 0);
             };
 
             const finishExam = (answers, isTimeOut) => {
@@ -492,12 +563,19 @@
                 window.scrollTo(0, 0);
             };
 
-            if (gameState === 'menu') return <MenuScreen onStart={startExam} />;
-            if (gameState === 'exam') return <ExamInterface mode={mode} questions={currentQuestions} onFinish={finishExam} onHome={() => setGameState('menu')} />;
-            if (gameState === 'result') return <ResultScreen questions={currentQuestions} userAnswers={finalAnswers} onRestart={() => setGameState('menu')} />;
-            return null;
-        };
+            // Logic การแสดงผลหน้าจอ
+            let content;
+            if (gameState === 'menu') content = <MenuScreen onStart={startExam} />;
+            else if (gameState === 'exam') content = <ExamInterface mode={mode} examData={currentExamData} onFinish={finishExam} onHome={() => setGameState('menu')} />;
+            else if (gameState === 'result') content = <ResultSummary examData={currentExamData} userAnswers={finalAnswers} onRestart={() => setGameState('menu')} />;
 
+            return (
+                <>
+                    {showDisclaimer && <DisclaimerModal onClose={handleCloseDisclaimer} />}
+                    {content}
+                </>
+            );
+        };
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
